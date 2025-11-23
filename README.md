@@ -1,4 +1,4 @@
-# Backend Lab 3: Validation, error handling, ORM
+# Backend Lab 4
 
 **Author:** Kyryl Kozarezov, IM-33
 
@@ -109,5 +109,6 @@ Expected response:
 ### Other 
 
 `http://127.0.0.1:8000/docs`
+
 
 Follow this link you can test all of used methods like POST,GET, etc. and all endpoints
