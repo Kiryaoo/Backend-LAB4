@@ -21,6 +21,7 @@ from config import (
     REDOC_PATH,
 )
 from contextlib import asynccontextmanager
+from auth import get_password_hash, verify_password, create_access_token
 
 app = FastAPI(
     title=API_TITLE,
@@ -70,7 +71,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.post("/users/", response_model=User, status_code=201)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
-    obj = UserORM(name=user.name)
+    hashed = get_password_hash(user.password)
+    obj = UserORM(name=user.name, password=hashed)
     db.add(obj)
     db.commit()
     db.refresh(obj)
@@ -79,6 +81,16 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(obj)
     return obj
+
+
+@app.post("/login")
+def login(user_data: UserCreate, db: Session = Depends(get_db)):
+    # Authenticate by name and password
+    user = db.query(UserORM).filter(UserORM.name == user_data.name).first()
+    if not user or not verify_password(user_data.password, user.password):
+        raise HTTPException(status_code=401, detail="Incorrect username or password")
+    access_token = create_access_token({"sub": str(user.id)})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/users/{user_id}", response_model=User)
 def get_user(user_id: int, db: Session = Depends(get_db)):
