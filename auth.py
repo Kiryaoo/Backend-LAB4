@@ -6,6 +6,10 @@ from jwt import PyJWTError
 from passlib.hash import pbkdf2_sha256
 
 from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from fastapi import Request, HTTPException, status, Depends
+from database import get_db
+from sqlalchemy.orm import Session
+from db_models import UserORM
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -35,3 +39,24 @@ def decode_access_token(token: str) -> dict | None:
         return payload
     except PyJWTError:
         return None
+
+
+def jwt_required(request: Request, db: Session = Depends(get_db)) -> UserORM:
+    """FastAPI dependency that validates a Bearer JWT and returns the authenticated UserORM.
+
+    Usage in endpoints: current_user: UserORM = Depends(jwt_required)
+    """
+    auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
+    if not auth_header or not auth_header.lower().startswith("bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid Authorization header")
+    token = auth_header.split()[1]
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    user_id = payload.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+    user = db.query(UserORM).filter(UserORM.id == int(user_id)).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    return user

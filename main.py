@@ -21,7 +21,7 @@ from config import (
     REDOC_PATH,
 )
 from contextlib import asynccontextmanager
-from auth import get_password_hash, verify_password, create_access_token
+from auth import get_password_hash, verify_password, create_access_token, jwt_required
 
 app = FastAPI(
     title=API_TITLE,
@@ -104,7 +104,10 @@ def list_users(db: Session = Depends(get_db)):
     return db.query(UserORM).all()
 
 @app.delete("/users/{user_id}", status_code=204)
-def delete_user(user_id: int, db: Session = Depends(get_db)):
+def delete_user(user_id: int, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
+    # only allow users to delete their own account
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Cannot delete other users")
     obj = db.query(UserORM).filter(UserORM.id == user_id).first()
     if not obj:
         raise HTTPException(404, "User not found")
@@ -113,7 +116,7 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     return JSONResponse(status_code=204, content=None)
 
 @app.post("/categories/", response_model=Category, status_code=201)
-def create_category(category: CategoryCreate, db: Session = Depends(get_db)):
+def create_category(category: CategoryCreate, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
     obj = CategoryORM(title=category.title)
     db.add(obj)
     db.commit()
@@ -132,7 +135,7 @@ def list_categories(db: Session = Depends(get_db)):
     return db.query(CategoryORM).all()
 
 @app.delete("/categories/{category_id}", status_code=204)
-def delete_category(category_id: int, db: Session = Depends(get_db)):
+def delete_category(category_id: int, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
     obj = db.query(CategoryORM).filter(CategoryORM.id == category_id).first()
     if not obj:
         raise HTTPException(404, "Category not found")
@@ -141,7 +144,10 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
     return JSONResponse(status_code=204, content=None)
 
 @app.post("/records/", response_model=Record, status_code=201)
-def create_record(record: RecordCreate, db: Session = Depends(get_db)):
+def create_record(record: RecordCreate, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
+    # Only allow creating records for the authenticated user
+    if current_user.id != record.user_id:
+        raise HTTPException(status_code=403, detail="Cannot create records for other users")
     if not db.query(UserORM).filter(UserORM.id == record.user_id).first():
         raise HTTPException(404, "User not found")
     if not db.query(CategoryORM).filter(CategoryORM.id == record.category_id).first():
@@ -184,10 +190,13 @@ def list_records(user_id: int | None = Query(None, ge=1), category_id: int | Non
     return query.all()
 
 @app.delete("/records/{record_id}", status_code=204)
-def delete_record(record_id: int, db: Session = Depends(get_db)):
+def delete_record(record_id: int, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
     obj = db.query(RecordORM).filter(RecordORM.id == record_id).first()
     if not obj:
         raise HTTPException(404, "Record not found")
+    # only owner can delete their record
+    if obj.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Cannot delete other user's record")
     db.delete(obj)
     db.commit()
     return JSONResponse(status_code=204, content=None)
@@ -201,7 +210,10 @@ def get_account(user_id: int, db: Session = Depends(get_db)):
 
 
 @app.post("/accounts/{user_id}/deposit", response_model=Account)
-def deposit_account(user_id: int, payload: AccountDeposit, db: Session = Depends(get_db)):
+def deposit_account(user_id: int, payload: AccountDeposit, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
+    # Only allow deposits to the authenticated user's account
+    if current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Cannot deposit to other user's account")
     acc = db.query(AccountORM).filter(AccountORM.user_id == user_id).first()
     if not acc:
         user = db.query(UserORM).filter(UserORM.id == user_id).first()
