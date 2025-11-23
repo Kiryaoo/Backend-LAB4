@@ -6,6 +6,20 @@ from jwt import PyJWTError
 from passlib.hash import pbkdf2_sha256
 
 from config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+import jwt as _jwt_lib
+
+
+# Custom exceptions for FastAPI exception handlers
+class JWTExpiredError(Exception):
+    pass
+
+
+class JWTInvalidError(Exception):
+    pass
+
+
+class JWTMissingError(Exception):
+    pass
 from fastapi import Request, HTTPException, status, Depends
 from database import get_db
 from sqlalchemy.orm import Session
@@ -37,8 +51,12 @@ def decode_access_token(token: str) -> dict | None:
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
-    except PyJWTError:
-        return None
+    except _jwt_lib.ExpiredSignatureError:
+        # token expired
+        raise JWTExpiredError()
+    except (_jwt_lib.InvalidSignatureError, _jwt_lib.DecodeError, PyJWTError):
+        # invalid token / signature verification failed
+        raise JWTInvalidError()
 
 
 def jwt_required(request: Request, db: Session = Depends(get_db)) -> UserORM:
@@ -48,15 +66,15 @@ def jwt_required(request: Request, db: Session = Depends(get_db)) -> UserORM:
     """
     auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
     if not auth_header or not auth_header.lower().startswith("bearer "):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing or invalid Authorization header")
+        # signal missing token to be handled by centralized handler
+        raise JWTMissingError()
     token = auth_header.split()[1]
     payload = decode_access_token(token)
-    if not payload:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    # decode_access_token will raise JWTExpiredError or JWTInvalidError on problems
     user_id = payload.get("sub")
     if not user_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload")
+        raise JWTInvalidError()
     user = db.query(UserORM).filter(UserORM.id == int(user_id)).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        raise JWTInvalidError()
     return user

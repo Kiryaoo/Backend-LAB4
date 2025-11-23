@@ -22,6 +22,9 @@ from config import (
 )
 from contextlib import asynccontextmanager
 from auth import get_password_hash, verify_password, create_access_token, jwt_required
+from auth import JWTExpiredError, JWTInvalidError, JWTMissingError
+from fastapi.responses import JSONResponse as FastJSONResponse
+from fastapi import status as _status
 
 app = FastAPI(
     title=API_TITLE,
@@ -238,3 +241,31 @@ def hello_world():
 @app.get("/healthcheck")
 def healthcheck():
     return {"status": "ok"}
+
+
+# JWT error handlers (FastAPI equivalents of Flask-JWT-Extended callbacks)
+@app.exception_handler(JWTExpiredError)
+async def expired_token_callback(request, exc: JWTExpiredError):
+    return FastJSONResponse(
+        status_code=_status.HTTP_401_UNAUTHORIZED,
+        content={"message": "The token has expired.", "error": "token_expired"},
+    )
+
+
+@app.exception_handler(JWTInvalidError)
+async def invalid_token_callback(request, exc: JWTInvalidError):
+    return FastJSONResponse(
+        status_code=_status.HTTP_401_UNAUTHORIZED,
+        content={"message": "Signature verification failed.", "error": "invalid_token"},
+    )
+
+
+@app.exception_handler(JWTMissingError)
+async def missing_token_callback(request, exc: JWTMissingError):
+    return FastJSONResponse(
+        status_code=_status.HTTP_401_UNAUTHORIZED,
+        content={
+            "description": "Request does not contain an access token.",
+            "error": "authorization_required",
+        },
+    )
