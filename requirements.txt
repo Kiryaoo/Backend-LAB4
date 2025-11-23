@@ -7,5 +7,6 @@ alembic>=1.8.0 # for migrations
 pydantic>=1.10.0 # for data validation
 python-dotenv>=1.1.0 # for environment variable management
 PyJWT>=2.6.0  # for JWT
-passlib[bcrypt]>=1.7.4  # for password hashing
-PyJWT>=2.6.0  # for JWT handling
+python-jose[cryptography]
+passlib[bcrypt]
+python-multipart>=0.0.5 # for form data parsing
