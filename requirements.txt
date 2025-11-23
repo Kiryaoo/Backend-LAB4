@@ -8,5 +8,5 @@ pydantic>=1.10.0 # for data validation
 python-dotenv>=1.1.0 # for environment variable management
 PyJWT>=2.6.0  # for JWT
 python-jose[cryptography]
-passlib[bcrypt]
+passlib[bcrypt]>=1.7.4  # for password hashing
 python-multipart>=0.0.5 # for form data parsing
