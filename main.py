@@ -163,7 +163,8 @@ def create_record(record: RecordCreate, db: Session = Depends(get_db), current_u
     if acc.balance < record.amount:
         raise HTTPException(400, "Insufficient funds")
 
-    acc.balance = acc.balance - record.amount
+    from decimal import Decimal
+    acc.balance = acc.balance - Decimal(record.amount)
     obj = RecordORM(
         user_id=record.user_id,
         category_id=record.category_id,
@@ -225,9 +226,10 @@ def deposit_account(user_id: int, payload: AccountDeposit, db: Session = Depends
         acc = AccountORM(user_id=user_id, balance=0)
         db.add(acc)
         db.flush()
+    from decimal import Decimal
     if acc.balance is None:
         acc.balance = 0
-    acc.balance = acc.balance + payload.amount
+    acc.balance = acc.balance + Decimal(payload.amount)
     db.add(acc)
     db.commit()
     db.refresh(acc)
