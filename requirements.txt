@@ -1,0 +1,8 @@
+fastapi>=0.95.0
+uvicorn[standard]>=0.22.0
+sqlalchemy>=2.0.0 # for ORM
+psycopg2-binary>=2.9.0 # for PostgreSQL
+psycopg>=3.0.0 # for PostgreSQL
+alembic>=1.8.0 # for migrations
+pydantic>=1.10.0 # for data validation
+python-dotenv>=1.1.0 # for environment variable management
