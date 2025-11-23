@@ -35,3 +35,7 @@ def _build_database_url() -> str:
     return "sqlite:///./app.db"
 
 DATABASE_URL: str = _build_database_url()
+
+JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY")
+JWT_ALGORITHM: str = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
