@@ -8,10 +8,17 @@ class UserBase(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 class UserCreate(UserBase):
-    pass
+    password: str = Field(..., min_length=8)
 
 class User(UserBase):
     id: int
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class UserWithToken(User, Token):
+    pass
 
 class CategoryBase(BaseModel):
     title: str = Field(..., min_length=2, max_length=50)

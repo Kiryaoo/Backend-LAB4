@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Query, Depends
 from models import (
-    User, UserCreate,
+    User, UserCreate, UserWithToken,
     Category, CategoryCreate,
     Record, RecordCreate,
     Account, AccountDeposit,
@@ -72,8 +72,11 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"status": 500, "error": str(exc)}
     )
 
-@app.post("/users/", response_model=User, status_code=201)
+@app.post("/users/", response_model=UserWithToken, status_code=201)
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(UserORM).filter(UserORM.name == user.name).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Username already registered")
     hashed = get_password_hash(user.password)
     obj = UserORM(name=user.name, password=hashed)
     db.add(obj)
@@ -83,7 +86,14 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.add(acc)
     db.commit()
     db.refresh(obj)
-    return obj
+    
+    access_token = create_access_token({"sub": str(obj.id)})
+    return {
+        "id": obj.id,
+        "name": obj.name,
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 
 @app.post("/login")
@@ -96,14 +106,14 @@ def login(user_data: UserCreate, db: Session = Depends(get_db)):
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/users/{user_id}", response_model=User)
-def get_user(user_id: int, db: Session = Depends(get_db)):
+def get_user(user_id: int, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
     obj = db.query(UserORM).filter(UserORM.id == user_id).first()
     if not obj:
         raise HTTPException(404, "User not found")
     return obj
 
 @app.get("/users", response_model=list[User])
-def list_users(db: Session = Depends(get_db)):
+def list_users(db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
     return db.query(UserORM).all()
 
 @app.delete("/users/{user_id}", status_code=204)
@@ -127,14 +137,14 @@ def create_category(category: CategoryCreate, db: Session = Depends(get_db), cur
     return obj
 
 @app.get("/categories/{category_id}", response_model=Category)
-def get_category(category_id: int, db: Session = Depends(get_db)):
+def get_category(category_id: int, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
     obj = db.query(CategoryORM).filter(CategoryORM.id == category_id).first()
     if not obj:
         raise HTTPException(404, "Category not found")
     return obj
 
 @app.get("/categories", response_model=list[Category])
-def list_categories(db: Session = Depends(get_db)):
+def list_categories(db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
     return db.query(CategoryORM).all()
 
 @app.delete("/categories/{category_id}", status_code=204)
@@ -178,14 +188,14 @@ def create_record(record: RecordCreate, db: Session = Depends(get_db), current_u
     return obj
 
 @app.get("/records/{record_id}", response_model=Record)
-def get_record(record_id: int, db: Session = Depends(get_db)):
+def get_record(record_id: int, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
     obj = db.query(RecordORM).filter(RecordORM.id == record_id).first()
     if not obj:
         raise HTTPException(404, "Record not found")
     return obj
 
 @app.get("/records", response_model=list[Record])
-def list_records(user_id: int | None = Query(None, ge=1), category_id: int | None = Query(None, ge=1), db: Session = Depends(get_db)):
+def list_records(user_id: int | None = Query(None, ge=1), category_id: int | None = Query(None, ge=1), db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
     query = db.query(RecordORM)
     if user_id is not None:
         query = query.filter(RecordORM.user_id == user_id)
@@ -206,7 +216,7 @@ def delete_record(record_id: int, db: Session = Depends(get_db), current_user: U
     return JSONResponse(status_code=204, content=None)
 
 @app.get("/accounts/{user_id}", response_model=Account)
-def get_account(user_id: int, db: Session = Depends(get_db)):
+def get_account(user_id: int, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
     acc = db.query(AccountORM).filter(AccountORM.user_id == user_id).first()
     if not acc:
         raise HTTPException(404, "Account not found")

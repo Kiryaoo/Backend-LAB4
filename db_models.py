@@ -8,6 +8,7 @@ class UserORM(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(50), nullable=False)
+    password = Column(String(128), nullable=False)
 
     records = relationship("RecordORM", back_populates="user", cascade="all, delete-orphan")
     account = relationship("AccountORM", back_populates="user", uselist=False, cascade="all, delete-orphan")
