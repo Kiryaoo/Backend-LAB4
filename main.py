@@ -162,16 +162,16 @@ def delete_category(category_id: int, db: Session = Depends(get_db), current_use
 
 @app.post("/records/", response_model=Record, status_code=201)
 def create_record(record: RecordCreate, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
-    # Only allow creating records for the authenticated user
-    if current_user.id != record.user_id:
-        raise HTTPException(status_code=403, detail="Cannot create records for other users")
-    if not db.query(UserORM).filter(UserORM.id == record.user_id).first():
-        raise HTTPException(404, "User not found")
+    # Use authenticated user's ID
+    user_id = current_user.id
+    
     if not db.query(CategoryORM).filter(CategoryORM.id == record.category_id).first():
         raise HTTPException(404, "Category not found")
-    acc = db.query(AccountORM).filter(AccountORM.user_id == record.user_id).first()
+    
+    acc = db.query(AccountORM).filter(AccountORM.user_id == user_id).first()
     if not acc:
         raise HTTPException(404, "Account not found")
+    
     if acc.balance is None:
         acc.balance = 0
     if acc.balance < record.amount:
@@ -180,7 +180,7 @@ def create_record(record: RecordCreate, db: Session = Depends(get_db), current_u
     from decimal import Decimal
     acc.balance = acc.balance - Decimal(record.amount)
     obj = RecordORM(
-        user_id=record.user_id,
+        user_id=user_id,
         category_id=record.category_id,
         amount=record.amount,
         timestamp=record.timestamp,

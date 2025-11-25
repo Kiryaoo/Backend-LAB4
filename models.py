@@ -31,7 +31,6 @@ class Category(CategoryBase):
     id: int
 
 class RecordBase(BaseModel):
-    user_id: int = Field(..., ge=1)
     category_id: int = Field(..., ge=1)
     amount: float = Field(..., gt=0)
     timestamp: datetime
@@ -49,6 +48,7 @@ class RecordCreate(RecordBase):
 
 class Record(RecordBase):
     id: int
+    user_id: int
 
 
 class AccountBase(BaseModel):
