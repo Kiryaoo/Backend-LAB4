@@ -72,8 +72,8 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"status": 500, "error": str(exc)}
     )
 
-@app.post("/users/", response_model=UserWithToken, status_code=201)
-def create_user(user: UserCreate, db: Session = Depends(get_db)):
+@app.post("/register", response_model=UserWithToken, status_code=201)
+def register_user(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(UserORM).filter(UserORM.name == user.name).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Username already registered")
@@ -96,14 +96,19 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     }
 
 
-@app.post("/login")
+@app.post("/login", response_model=UserWithToken)
 def login(user_data: UserCreate, db: Session = Depends(get_db)):
     # Authenticate by name and password
     user = db.query(UserORM).filter(UserORM.name == user_data.name).first()
     if not user or not verify_password(user_data.password, user.password):
         raise HTTPException(status_code=401, detail="Incorrect username or password")
     access_token = create_access_token({"sub": str(user.id)})
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "id": user.id,
+        "name": user.name,
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
 
 @app.get("/users/{user_id}", response_model=User)
 def get_user(user_id: int, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
@@ -118,7 +123,6 @@ def list_users(db: Session = Depends(get_db), current_user: UserORM = Depends(jw
 
 @app.delete("/users/{user_id}", status_code=204)
 def delete_user(user_id: int, db: Session = Depends(get_db), current_user: UserORM = Depends(jwt_required)):
-    # only allow users to delete their own account
     if current_user.id != user_id:
         raise HTTPException(status_code=403, detail="Cannot delete other users")
     obj = db.query(UserORM).filter(UserORM.id == user_id).first()
